@@ -1,0 +1,32 @@
+{
+	"name": "project-subtitler",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"workspaces": [
+		"watcher",
+		"shared",
+		"worker",
+		"broadcast",
+		"frontend"
+	],
+	"scripts": {
+		"build": "docker build -f worker/Dockerfile -t project-subtitler-worker . && npm run build --workspace frontend",
+		"test": "npm run test --workspaces --if-present",
+		"typecheck": "npm run typecheck --workspaces --if-present",
+		"lint": "eslint ."
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.2",
+		"@typescript-eslint/eslint-plugin": "^8.19.0",
+		"@typescript-eslint/parser": "^8.19.0",
+		"eslint": "^9.17.0",
+		"eslint-plugin-react-hooks": "^5.1.0",
+		"globals": "^15.14.0",
+		"typescript": "^5.7.2",
+		"vitest": "^3.0.0"
+	},
+	"engines": {
+		"node": ">=23.6.0"
+	}
+}

@@ -1,0 +1,18 @@
+{
+	"name": "@project-subtitler/worker",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"main": "./src/index.ts",
+	"scripts": {
+		"start": "node src/index.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"lint": "eslint src"
+	},
+	"dependencies": {
+		"@deepgram/sdk": "^5.8.0",
+		"@project-subtitler/shared": "*",
+		"openai": "^7.5.0"
+	}
+}

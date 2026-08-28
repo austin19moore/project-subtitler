@@ -1,0 +1,26 @@
+{
+	email {$CADDY_EMAIL}
+	log {
+		level ERROR
+	}
+}
+
+{$CADDY_SITE} {
+	handle /sse* {
+		reverse_proxy broadcast:3000
+	}
+
+	handle /status* {
+		@public method GET
+		handle @public {
+			reverse_proxy broadcast:3000
+		}
+		respond 405
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

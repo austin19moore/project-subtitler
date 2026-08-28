@@ -1,0 +1,51 @@
+name: project-subtitler
+
+services:
+  broadcast:
+    build:
+      context: .
+      dockerfile: broadcast/Dockerfile
+    image: project-subtitler-broadcast
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  watcher:
+    build:
+      context: .
+      dockerfile: watcher/Dockerfile
+    image: project-subtitler-watcher
+    env_file:
+      - .env
+    environment:
+      BROADCAST_URL: http://broadcast:3000
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
+      WORKER_NETWORK: project-subtitler_default
+    depends_on:
+      - docker-socket-proxy
+    restart: unless-stopped
+
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    environment:
+      LOG_LEVEL: err
+      CONTAINERS: 1
+      POST: 1
+      ALLOW_START: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "8080:8080"
+    environment:
+      - CADDY_EMAIL=${CADDY_EMAIL}
+      - CADDY_SITE=${CADDY_SITE}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv:ro
+    depends_on:
+      - broadcast
+    restart: unless-stopped

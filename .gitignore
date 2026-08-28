@@ -1,0 +1,13 @@
+.vscode
+**/node_modules
+**/dist
+**/.vite
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+!.env.example
+*.log
+**/whitelist.json
+!**/whitelist.json.example
+frontend/public/icons
