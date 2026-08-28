@@ -6,13 +6,13 @@ A live subtitler for YouTube live streams. Auto runs short lived workers to tran
 
 ### Environment
 
-Copy `.env.example` to `.env` and fill in the required environment variables.
+- Copy `.env.example` to `.env` and fill in the required environment variables.
 
-Copy `shared/whitelist.json.example` to `shared/whitelist.json` and fill in the required fields.
+- Copy `shared/whitelist.json.example` to `shared/whitelist.json` and fill in the required fields.
 
-Add icons to `frontend/public/icons`, the file names should match the slugs in `shared/whitelist.json`.
+- Add icons to `frontend/public/icons`, the file names should match the slugs in `shared/whitelist.json`.
 
-### Docker
+### Docker Setup
 
 ```bash
 npm run build
@@ -21,60 +21,60 @@ docker compose up -d
 
 ## Structure
 
-### `shared`
+### shared
 
-Shared code between workspaces. Containers logger, whitelist, and shared TypeScript types.
+- Shared code between workspaces. Containers logger, whitelist, and shared TypeScript types.
 
-### `watcher`
+### watcher
 
-Polls the streams pages of whitelisted channels and spawns/stops one worker container per live streamer via the Docker socket proxy.
+- Polls the streams pages of whitelisted channels and spawns/stops one worker container per live streamer via the Docker socket proxy.
 
-Uses [`dockerode`](https://github.com/apocas/dockerode) to interact with the Docker socket proxy.
+- Uses [`dockerode`](https://github.com/apocas/dockerode) to interact with the Docker socket proxy.
 
-### `docker-socket-proxy`
+### docker-socket-proxy
 
-Proxies the Docker socket for the watcher. Only exposes the container list, create, and start endpoints.
+- Proxies the Docker socket for the watcher. Only exposes the container list, create, and start endpoints.
 
-Uses [`docker-socket-proxy`](https://github.com/tecnativa/docker-socket-proxy) to restrict Docker socket access.
+- Uses [`docker-socket-proxy`](https://github.com/tecnativa/docker-socket-proxy) to restrict Docker socket access.
 
-### `worker`
+### worker
 
-Transcribes the live stream and sends the transcript to the broadcast container.
+- Transcribes the live stream and sends the transcript to the broadcast container.
 
-Uses [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) to download the stream.
+- Uses [`yt-dlp`](https://github.com/yt-dlp/yt-dlp) to get stream audio.
 
-Uses [`ffmpeg`](https://ffmpeg.org/) to convert the stream to PCM.
+- Uses [`ffmpeg`](https://ffmpeg.org/) to convert the stream to PCM.
 
-Uses [`@deepgram/sdk`](https://github.com/deepgram-devs/deepgram-sdk-js) to transcribe the stream.
+- Uses [`@deepgram/sdk`](https://github.com/deepgram-devs/deepgram-sdk-js) to transcribe the stream.
 
-Uses [`openai`](https://github.com/openai/openai-node) to translate.
+- Uses [`openai`](https://github.com/openai/openai-node) to translate.
 
-### `broadcast`
+### broadcast
 
-Receives the transcripts from the workers and sends them to the frontend.
+- Receives the transcripts from the workers and sends them to the frontend.
 
-Uses [`better-sse`](https://github.com/MatthewWid/better-sse) to send the transcripts to the frontend.
+- Uses [`better-sse`](https://github.com/MatthewWid/better-sse) to send the transcripts to the frontend.
 
-### `frontend`
+### frontend
 
-Displays the subtitles. Built with Vite and React.
+- Displays the subtitles. Built with Vite and React.
 
-Uses Tailwind CSS for styling.
+- Uses Tailwind CSS for styling.
 
-### `caddy`
+### caddy
 
-Serves the frontend and proxies the SSE and status routes to the broadcast container.
+- Serves the frontend and proxies the SSE and status routes to the broadcast container.
 
 ## Development
 
-Set `NODE_ENV` environment variable to `development` to enable development logging.
+- Set `NODE_ENV` environment variable to `development` to enable development logging.
 
-Run `npm install` to install dependencies.
+- Run `npm install` to install dependencies.
 
-Run `npm run typecheck` to check for type errors.
+- Run `npm run typecheck` to check for type errors.
 
-Run `npm run lint` to check for lint errors.
+- Run `npm run lint` to check for lint errors.
 
-Run `npm run test` to run the test suite.
+- Run `npm run test` to run the test suite.
 
-Run `npm run build` to build the frontend and worker image.
+- Run `npm run build` to build the frontend and worker image.
