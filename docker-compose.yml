@@ -40,6 +40,7 @@ services:
     image: caddy:2
     ports:
       - "80:80"
+      - "443:443"
     environment:
       - CADDY_EMAIL=${CADDY_EMAIL}
       - CADDY_SITE=${CADDY_SITE}
