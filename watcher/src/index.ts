@@ -43,7 +43,7 @@ const pollWhitelist = async (whitelist: WhitelistEntry[]): Promise<void> => {
         try {
             const videoId = await getLatestStreamIdByChannel(entry.channelId);
             const latestStream = `https://www.youtube.com/watch?v=${videoId}`;
-            const live = (videoId !== null && await isStreamLive(latestStream));
+            const live = videoId !== null;
             await reportStatus(entry.slug, live ? videoId : null);
             if (live) {
                 // Check if container is already running
@@ -97,37 +97,17 @@ const reportStatus = async (slug: string, streamId?: string | null): Promise<voi
     }).catch(err => log.error(`Failed to report status for ${slug}: ${err}`));
 };
 
-const isStreamLive = async (streamUrl: string): Promise<boolean> => {
-    try {
-        const response = await fetch(streamUrl, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-        });
-        const html = await response.text();
-        return /"isLiveNow":true/.test(html);
-    } catch (err) {
-        log.error(`Failed to check live status for ${streamUrl}: ${err}`);
-        return false;
-    }
-};
-
 /*
  * Scrapes youtube page structure to try and get the latest stream ID
  * The RSS feed has random outages, so this is more reliable but is prone to breaking if youtube changes their page structure
  */
 const getLatestStreamIdByChannel = async (channelId: string): Promise<string | null> => {
     try {
-        const response = await fetch(`https://www.youtube.com/channel/${channelId}/streams`, {
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            },
-        });
+        const response = await fetch(`https://www.youtube.com/channel/${channelId}/streams`);
         if (!response.ok) return null;
         const html = await response.text();
-        const badgeIndex = html.indexOf('"liveBadgeText"');
-        if (badgeIndex === -1) return null;
-        const match = html.slice(badgeIndex).match(/"videoId":"([^"]+)"/);
+        // liveBadgeText only appears in the header "watch live" button when the channel is live, so the watchEndpoint right after is the stream
+        const match = html.match(/"liveBadgeText":"[^"]*"[\s\S]*?"watchEndpoint":\{"videoId":"([^"]+)"/);
         return match ? match[1] : null;
     } catch (err) {
         log.error(`Failed to scrape /streams page for ${channelId}: ${err}`);
