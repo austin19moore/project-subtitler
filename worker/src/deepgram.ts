@@ -18,7 +18,7 @@ export class Deepgram {
     private readonly idleTimeoutMs = Number(process.env.WORKER_IDLE_TIMEOUT_MS || 120000);
     private readonly vadThreshold = process.env.DEEPGRAM_VAD_THRESHOLD || '0.6';
     private readonly vadPreendBufferMs = process.env.DEEPGRAM_VAD_PREEND_BUFFER_MS || '300';
-    private lastAudioAt = 0;
+    private lastAudioAt = Date.now();
     private idleTimer: NodeJS.Timeout | null = null;
     private pcmReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
@@ -123,7 +123,6 @@ export class Deepgram {
 
     startIdleWatchdog() {
         this.idleTimer = setInterval(() => {
-            if (this.lastAudioAt === 0) return; // no audio yet
             const idleMs = Date.now() - this.lastAudioAt;
             if (idleMs > this.idleTimeoutMs) {
                 log.info(`No audio received for ${Math.round(idleMs / 1000)}s, shutting down worker`);
