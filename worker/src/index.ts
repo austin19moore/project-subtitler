@@ -53,6 +53,9 @@ const main = async (): Promise<void> => {
     // deepgram transcribe (read from pcm, feed chunks to Deepgram WebSocket)
     const deepgram = new Deepgram(DEEPGRAM_API_KEY, SOURCE_LANGUAGE, KEYTERMS as string[]);
     deepgram.startIdleWatchdog();
+    // maintain arrival order
+    let translations: Promise<void> = Promise.resolve();
+
     deepgram.connect(pcm, (text, isFinal, words) => {
         if (!isFinal) return;
         log.debug('transcribed:', text);
@@ -60,18 +63,20 @@ const main = async (): Promise<void> => {
             log.debug('skipping junk transcript:', text);
             return;
         }
-        openai.translate(text, words).then(translation => {
-            log.debug('translated:', translation);
-            // send to broadcast
-            return pushToBroadcast({
-                channel: SLUG,
-                transcript: text,
-                translation,
-                timestamp: Date.now(),
+        translations = translations
+            .then(() => openai.translate(text, words))
+            .then(translation => {
+                log.debug('translated:', translation);
+                // send to broadcast
+                return pushToBroadcast({
+                    channel: SLUG,
+                    transcript: text,
+                    translation,
+                    timestamp: Date.now(),
+                });
+            }).catch(err => {
+                log.error('Translation failed: ', err);
             });
-        }).catch(err => {
-            log.error('Translation failed: ', err);
-        });
     }).catch(err => {
         log.critical(`Deepgram connect failed: `, err);
         process.exit(1);
