@@ -5,12 +5,19 @@ const log = createLogger('worker');
 
 export const startAudioPipeline = (STREAM_URL: string): Promise<ReadableStream<Uint8Array>> => {
     return new Promise((resolve, reject) => {
-        const ytDlp = spawn('yt-dlp', [
+        const args = [
             '--no-warnings',
             '-f', 'bestaudio',
             '-o', '-',
-            STREAM_URL,
-        ]);
+        ];
+
+        if (process.env.YTDLP_PROXY) {
+            args.push('--proxy', process.env.YTDLP_PROXY);
+        }
+
+        args.push(STREAM_URL);
+
+        const ytDlp = spawn('yt-dlp', args);
 
         // 16kHz mono s16le PCM
         const ffmpeg = spawn('ffmpeg', [

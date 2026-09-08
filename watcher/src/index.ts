@@ -9,7 +9,6 @@ const WATCHER_POLL_INTERVAL = Number(process.env.WATCH_POLL_INTERVAL || 60000);
 const WORKER_IMAGE = process.env.WORKER_IMAGE || "project-subtitler-worker";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const TRANSCRIPTION_CONTEXT_LENGTH = Number(process.env.TRANSCRIPTION_CONTEXT_LENGTH || 5);
-const ALERT_WEBHOOK_URL = process.env.ALERT_WEBHOOK_URL;
 const WORKER_IDLE_TIMEOUT_MS = Number(process.env.WORKER_IDLE_TIMEOUT_MS || 120000);
 const DEEPGRAM_MAX_RECONNECT_ATTEMPTS = Number(process.env.DEEPGRAM_MAX_RECONNECT_ATTEMPTS || 5);
 const WORKER_NETWORK = process.env.WORKER_NETWORK || 'project-subtitler_default';
@@ -68,12 +67,13 @@ const pollWhitelist = async (whitelist: WhitelistEntry[]): Promise<void> => {
                             'OPENAI_API_KEY=' + OPENAI_API_KEY,
                             'OPENAI_MODEL=' + OPENAI_MODEL,
                             'TRANSCRIPTION_CONTEXT_LENGTH=' + TRANSCRIPTION_CONTEXT_LENGTH,
-                            'ALERT_WEBHOOK_URL=' + (ALERT_WEBHOOK_URL || ''),
+                            'ALERT_WEBHOOK_URL=' + (process.env.ALERT_WEBHOOK_URL || ''),
                             'WORKER_IDLE_TIMEOUT_MS=' + WORKER_IDLE_TIMEOUT_MS,
                             'DEEPGRAM_MAX_RECONNECT_ATTEMPTS=' + DEEPGRAM_MAX_RECONNECT_ATTEMPTS,
                             'BROADCAST_URL=' + BROADCAST_URL,
                             'BROADCAST_SECRET=' + BROADCAST_SECRET,
                             'NODE_ENV=' + process.env.NODE_ENV,
+                            'YTDLP_PROXY=' + (process.env.YTDLP_PROXY || ''),
                         ]
                     });
                     await docker.getContainer(entry.slug).start();
