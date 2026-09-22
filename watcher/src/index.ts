@@ -4,18 +4,21 @@ import Dockerode from 'dockerode';
 
 const docker = new Dockerode({ socketPath: '/var/run/docker.sock' });
 const log = createLogger('watcher');
-const WATCHER_POLL_INTERVAL = Number(process.env.WATCH_POLL_INTERVAL || 60000);
+const workerIdleSince = new Map<string, number>();
 
+const WATCHER_POLL_INTERVAL = Number(process.env.WATCH_POLL_INTERVAL || 60000);
 const WORKER_IMAGE = process.env.WORKER_IMAGE || "project-subtitler-worker";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const TRANSCRIPTION_CONTEXT_LENGTH = Number(process.env.TRANSCRIPTION_CONTEXT_LENGTH || 5);
 const WORKER_IDLE_TIMEOUT_MS = Number(process.env.WORKER_IDLE_TIMEOUT_MS || 120000);
 const DEEPGRAM_MAX_RECONNECT_ATTEMPTS = Number(process.env.DEEPGRAM_MAX_RECONNECT_ATTEMPTS || 5);
 const WORKER_NETWORK = process.env.WORKER_NETWORK || 'project-subtitler_default';
+const LISTENER_CHECK_INTERVAL = Number(process.env.LISTENER_CHECK_INTERVAL || 30000);
+const IDLE_SHUTDOWN_TIMEOUT = Number(process.env.IDLE_SHUTDOWN_TIMEOUT || 60000);
 
-const BROADCAST_SECRET=requireEnv(log, 'BROADCAST_SECRET');
-const DEEPGRAM_API_KEY=requireEnv(log, 'DEEPGRAM_API_KEY');
-const OPENAI_API_KEY=requireEnv(log, 'OPENAI_API_KEY');
+const BROADCAST_SECRET = requireEnv(log, 'BROADCAST_SECRET');
+const DEEPGRAM_API_KEY = requireEnv(log, 'DEEPGRAM_API_KEY');
+const OPENAI_API_KEY = requireEnv(log, 'OPENAI_API_KEY');
 const BROADCAST_URL = requireEnv(log, 'BROADCAST_URL');
 
 const main = async (): Promise<void> => {
@@ -35,6 +38,15 @@ const main = async (): Promise<void> => {
             log.error(`Whitelist poll failed: `, err);
         }
     }, WATCHER_POLL_INTERVAL);
+
+    // periodically check listener counts and shut down idle workers
+    setInterval(async () => {
+        try {
+            await checkIdleWorkers(whitelist);
+        } catch (err) {
+            log.error(`Idle worker check failed: `, err);
+        }
+    }, LISTENER_CHECK_INTERVAL);
 }
 
 const pollWhitelist = async (whitelist: WhitelistEntry[]): Promise<void> => {
@@ -45,39 +57,45 @@ const pollWhitelist = async (whitelist: WhitelistEntry[]): Promise<void> => {
             const live = videoId !== null;
             await reportStatus(entry.slug, live ? videoId : null);
             if (live) {
-                // Check if container is already running
-                const containers = await docker.listContainers({ filters: { name: [entry.slug] } });
-                if (containers.length === 0) {
-                    log.info(`${entry.name} is LIVE! Starting worker...`);
-                    await docker.createContainer({
-                        Image: WORKER_IMAGE,
-                        name: entry.slug,
-                        Cmd: ["node", "worker/src/index.ts"],
-                        HostConfig: {
-                            AutoRemove: true,
-                            NetworkMode: WORKER_NETWORK,
-                        },
-                        Env: [
-                            'STREAM_URL=' + latestStream,
-                            'SLUG=' + entry.slug,
-                            'KEYTERMS=' + entry.keyterms.join(","),
-                            'SOURCE_LANGUAGE=' + entry.sourceLanguage,
-                            'TARGET_LANGUAGE=' + entry.targetLanguage,
-                            'DEEPGRAM_API_KEY=' + DEEPGRAM_API_KEY,
-                            'OPENAI_API_KEY=' + OPENAI_API_KEY,
-                            'OPENAI_MODEL=' + OPENAI_MODEL,
-                            'TRANSCRIPTION_CONTEXT_LENGTH=' + TRANSCRIPTION_CONTEXT_LENGTH,
-                            'ALERT_WEBHOOK_URL=' + (process.env.ALERT_WEBHOOK_URL || ''),
-                            'WORKER_IDLE_TIMEOUT_MS=' + WORKER_IDLE_TIMEOUT_MS,
-                            'DEEPGRAM_MAX_RECONNECT_ATTEMPTS=' + DEEPGRAM_MAX_RECONNECT_ATTEMPTS,
-                            'BROADCAST_URL=' + BROADCAST_URL,
-                            'BROADCAST_SECRET=' + BROADCAST_SECRET,
-                            'NODE_ENV=' + process.env.NODE_ENV,
-                            'YTDLP_PROXY=' + (process.env.YTDLP_PROXY || ''),
-                        ]
-                    });
-                    await docker.getContainer(entry.slug).start();
-                    log.info(`Container started for ${entry.name}`);
+                const listenerCount = await getListenerCount(entry.slug);
+                if (listenerCount === 0) {
+                    log.info(`${entry.name} is LIVE but no listeners. Skipping/stopping worker...`);
+                    await killWorkerIfRunning(entry.slug);
+                } else if (listenerCount >= 0) {
+                    // Check if container is already running
+                    const containers = await docker.listContainers({ filters: { name: [entry.slug] } });
+                    if (containers.length === 0) {
+                        log.info(`${entry.name} is LIVE! Starting worker...`);
+                        await docker.createContainer({
+                            Image: WORKER_IMAGE,
+                            name: entry.slug,
+                            Cmd: ["node", "worker/src/index.ts"],
+                            HostConfig: {
+                                AutoRemove: true,
+                                NetworkMode: WORKER_NETWORK,
+                            },
+                            Env: [
+                                'STREAM_URL=' + latestStream,
+                                'SLUG=' + entry.slug,
+                                'KEYTERMS=' + entry.keyterms.join(","),
+                                'SOURCE_LANGUAGE=' + entry.sourceLanguage,
+                                'TARGET_LANGUAGE=' + entry.targetLanguage,
+                                'DEEPGRAM_API_KEY=' + DEEPGRAM_API_KEY,
+                                'OPENAI_API_KEY=' + OPENAI_API_KEY,
+                                'OPENAI_MODEL=' + OPENAI_MODEL,
+                                'TRANSCRIPTION_CONTEXT_LENGTH=' + TRANSCRIPTION_CONTEXT_LENGTH,
+                                'ALERT_WEBHOOK_URL=' + (process.env.ALERT_WEBHOOK_URL || ''),
+                                'WORKER_IDLE_TIMEOUT_MS=' + WORKER_IDLE_TIMEOUT_MS,
+                                'DEEPGRAM_MAX_RECONNECT_ATTEMPTS=' + DEEPGRAM_MAX_RECONNECT_ATTEMPTS,
+                                'BROADCAST_URL=' + BROADCAST_URL,
+                                'BROADCAST_SECRET=' + BROADCAST_SECRET,
+                                'NODE_ENV=' + process.env.NODE_ENV,
+                                'YTDLP_PROXY=' + (process.env.YTDLP_PROXY || ''),
+                            ]
+                        });
+                        await docker.getContainer(entry.slug).start();
+                        log.info(`Container started for ${entry.name}`);
+                    }
                 }
             }
         } catch (err) {
@@ -112,6 +130,60 @@ const getLatestStreamIdByChannel = async (channelId: string): Promise<string | n
     } catch (err) {
         log.error(`Failed to scrape /streams page for ${channelId}: ${err}`);
         return null;
+    }
+};
+
+const getListenerCount = async (slug: string): Promise<number> => {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5000);
+        try {
+            const response = await fetch(`${BROADCAST_URL}/listeners/${slug}`, { signal: controller.signal });
+            if (!response.ok) return 0;
+            const data = await response.json() as { count: number };
+            return data.count || 0;
+        } finally {
+            clearTimeout(timeout);
+        }
+    } catch (err) {
+        log.error(`Failed to get listener count for ${slug}: ${err}`);
+        return -1;
+    }
+};
+
+const killWorkerIfRunning = async (slug: string): Promise<void> => {
+    try {
+        const containers = await docker.listContainers({ filters: { name: [slug] } });
+        if (containers.length > 0) {
+            const container = docker.getContainer(slug);
+            await container.stop();
+            log.info(`Stopped idle worker for ${slug}`);
+        }
+    } catch (err) {
+        log.error(`Failed to stop worker for ${slug}: ${err}`);
+    }
+};
+
+const checkIdleWorkers = async (whitelist: WhitelistEntry[]): Promise<void> => {
+    for (const entry of whitelist) {
+        const videoId = await getLatestStreamIdByChannel(entry.channelId);
+        if (videoId === null) continue;
+
+        const count = await getListenerCount(entry.slug);
+        if (count < 0) continue;
+        if (count === 0) {
+            if (!workerIdleSince.has(entry.slug)) {
+                workerIdleSince.set(entry.slug, Date.now());
+            }
+            const elapsed = Date.now() - workerIdleSince.get(entry.slug)!;
+            if (elapsed >= IDLE_SHUTDOWN_TIMEOUT) {
+                log.info(`${entry.name} had no listeners for ${Math.round(elapsed / 1000)}s, shutting down worker`);
+                await killWorkerIfRunning(entry.slug);
+                workerIdleSince.delete(entry.slug);
+            }
+        } else {
+            workerIdleSince.delete(entry.slug);
+        }
     }
 };
 

@@ -89,6 +89,15 @@ app.post('/broadcast', (req: express.Request, res: express.Response) => {
     res.status(200).end();
 });
 
+app.get('/listeners/:channel', (req: express.Request, res: express.Response) => {
+    const channel = req.params.channel;
+    if (!isValidChannel(channel)) {
+        return res.status(400).send('invalid channel');
+    }
+    const ch = channels.get(channel);
+    res.json({ count: ch ? ch.sessionCount : 0 });
+});
+
 app.get('/status', statusGetLimiter, (req: express.Request, res: express.Response) => {
     const channel = req.query.channel;
     if (!isValidChannel(channel)) {

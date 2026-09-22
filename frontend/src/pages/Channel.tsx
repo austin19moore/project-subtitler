@@ -106,6 +106,9 @@ export const Channel = () => {
 					</Link>
 					<div className="text-lg font-bold">Not live right now</div>
 				</div>
+				<div className="mt-4 px-4 text-center text-sm text-neutral-400">
+					If the stream has just started or you are the first viewer, this page should update automatically within 30-60s, otherwise try manually refreshing the page
+				</div>
 			</div>
 		);
 	}
