@@ -52,12 +52,13 @@ const main = async (): Promise<void> => {
 const pollWhitelist = async (whitelist: WhitelistEntry[]): Promise<void> => {
     await Promise.all(whitelist.map(async (entry) => {
         try {
+            const listenerCount = await getListenerCount(entry.slug);
+            if (listenerCount === 0) return;
             const videoId = await getLatestStreamIdByChannel(entry.channelId);
             const latestStream = `https://www.youtube.com/watch?v=${videoId}`;
             const live = videoId !== null;
             await reportStatus(entry.slug, live ? videoId : null);
-            const listenerCount = await getListenerCount(entry.slug);
-            if (live && listenerCount > 0) {
+            if (live) {
                 // Check if container is already running
                 const containers = await docker.listContainers({ filters: { name: [entry.slug] } });
                 if (containers.length === 0) {
