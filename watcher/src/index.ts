@@ -146,19 +146,6 @@ const getListenerCount = async (slug: string): Promise<number> => {
     }
 };
 
-const killWorkerIfRunning = async (slug: string): Promise<void> => {
-    try {
-        const containers = await docker.listContainers({ filters: { name: [slug] } });
-        if (containers.length > 0) {
-            const container = docker.getContainer(slug);
-            await container.stop();
-            log.info(`Stopped idle worker for ${slug}`);
-        }
-    } catch (err) {
-        log.error(`Failed to stop worker for ${slug}: ${err}`);
-    }
-};
-
 const checkIdleWorkers = async (whitelist: WhitelistEntry[]): Promise<void> => {
     for (const entry of whitelist) {
         const videoId = await getLatestStreamIdByChannel(entry.channelId);
@@ -172,8 +159,16 @@ const checkIdleWorkers = async (whitelist: WhitelistEntry[]): Promise<void> => {
             }
             const elapsed = Date.now() - workerIdleSince.get(entry.slug)!;
             if (elapsed >= IDLE_SHUTDOWN_TIMEOUT) {
-                log.info(`${entry.name} had no listeners for ${Math.round(elapsed / 1000)}s, shutting down worker`);
-                await killWorkerIfRunning(entry.slug);
+                try {
+                    const containers = await docker.listContainers({ filters: { name: [entry.slug] } });
+                    if (containers.length > 0) {
+                        log.info(`${entry.name} had no listeners for ${Math.round(elapsed / 1000)}s, shutting down worker`);
+                        const container = docker.getContainer(entry.slug);
+                        await container.stop();
+                    }
+                } catch (err) {
+                    log.error(`Failed to stop worker for ${entry.slug}: ${err}`);
+                }
                 workerIdleSince.delete(entry.slug);
             }
         } else {
