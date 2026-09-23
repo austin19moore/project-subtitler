@@ -144,13 +144,13 @@ export const Channel = () => {
 				</div>
 			</div>
 
-			<div className="flex-1 md:flex-2 min-h-0 w-full max-w-5xl mx-auto text-center">
+			<div className="flex-1 md:flex-2 min-h-0 w-full max-w-5xl mx-auto">
 				{lines.length === 0 ? (
                     <div>
-                        <div className="h-full flex items-center justify-center text-neutral-400/35">
+                        <div className="h-full flex items-center justify-center text-center text-neutral-400/35">
                             No translations yet
                         </div>
-                        <div className="h-full flex items-center justify-center text-sm mt-4 text-neutral-400/35">
+                        <div className="h-full flex items-center justify-center text-center text-sm mt-4 text-neutral-400/35">
                             If the stream has just started or you are the first viewer, translations should update automatically within 30-60s, otherwise try manually refreshing the page
                         </div>
                     </div>
