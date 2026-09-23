@@ -56,46 +56,41 @@ const pollWhitelist = async (whitelist: WhitelistEntry[]): Promise<void> => {
             const latestStream = `https://www.youtube.com/watch?v=${videoId}`;
             const live = videoId !== null;
             await reportStatus(entry.slug, live ? videoId : null);
-            if (live) {
-                const listenerCount = await getListenerCount(entry.slug);
-                if (listenerCount === 0) {
-                    log.info(`${entry.name} is LIVE but no listeners. Skipping/stopping worker...`);
-                    await killWorkerIfRunning(entry.slug);
-                } else if (listenerCount >= 0) {
-                    // Check if container is already running
-                    const containers = await docker.listContainers({ filters: { name: [entry.slug] } });
-                    if (containers.length === 0) {
-                        log.info(`${entry.name} is LIVE! Starting worker...`);
-                        await docker.createContainer({
-                            Image: WORKER_IMAGE,
-                            name: entry.slug,
-                            Cmd: ["node", "worker/src/index.ts"],
-                            HostConfig: {
-                                AutoRemove: true,
-                                NetworkMode: WORKER_NETWORK,
-                            },
-                            Env: [
-                                'STREAM_URL=' + latestStream,
-                                'SLUG=' + entry.slug,
-                                'KEYTERMS=' + entry.keyterms.join(","),
-                                'SOURCE_LANGUAGE=' + entry.sourceLanguage,
-                                'TARGET_LANGUAGE=' + entry.targetLanguage,
-                                'DEEPGRAM_API_KEY=' + DEEPGRAM_API_KEY,
-                                'OPENAI_API_KEY=' + OPENAI_API_KEY,
-                                'OPENAI_MODEL=' + OPENAI_MODEL,
-                                'TRANSCRIPTION_CONTEXT_LENGTH=' + TRANSCRIPTION_CONTEXT_LENGTH,
-                                'ALERT_WEBHOOK_URL=' + (process.env.ALERT_WEBHOOK_URL || ''),
-                                'WORKER_IDLE_TIMEOUT_MS=' + WORKER_IDLE_TIMEOUT_MS,
-                                'DEEPGRAM_MAX_RECONNECT_ATTEMPTS=' + DEEPGRAM_MAX_RECONNECT_ATTEMPTS,
-                                'BROADCAST_URL=' + BROADCAST_URL,
-                                'BROADCAST_SECRET=' + BROADCAST_SECRET,
-                                'NODE_ENV=' + process.env.NODE_ENV,
-                                'YTDLP_PROXY=' + (process.env.YTDLP_PROXY || ''),
-                            ]
-                        });
-                        await docker.getContainer(entry.slug).start();
-                        log.info(`Container started for ${entry.name}`);
-                    }
+            const listenerCount = await getListenerCount(entry.slug);
+            if (live && listenerCount > 0) {
+                // Check if container is already running
+                const containers = await docker.listContainers({ filters: { name: [entry.slug] } });
+                if (containers.length === 0) {
+                    log.info(`${entry.name} is LIVE! Starting worker...`);
+                    await docker.createContainer({
+                        Image: WORKER_IMAGE,
+                        name: entry.slug,
+                        Cmd: ["node", "worker/src/index.ts"],
+                        HostConfig: {
+                            AutoRemove: true,
+                            NetworkMode: WORKER_NETWORK,
+                        },
+                        Env: [
+                            'STREAM_URL=' + latestStream,
+                            'SLUG=' + entry.slug,
+                            'KEYTERMS=' + entry.keyterms.join(","),
+                            'SOURCE_LANGUAGE=' + entry.sourceLanguage,
+                            'TARGET_LANGUAGE=' + entry.targetLanguage,
+                            'DEEPGRAM_API_KEY=' + DEEPGRAM_API_KEY,
+                            'OPENAI_API_KEY=' + OPENAI_API_KEY,
+                            'OPENAI_MODEL=' + OPENAI_MODEL,
+                            'TRANSCRIPTION_CONTEXT_LENGTH=' + TRANSCRIPTION_CONTEXT_LENGTH,
+                            'ALERT_WEBHOOK_URL=' + (process.env.ALERT_WEBHOOK_URL || ''),
+                            'WORKER_IDLE_TIMEOUT_MS=' + WORKER_IDLE_TIMEOUT_MS,
+                            'DEEPGRAM_MAX_RECONNECT_ATTEMPTS=' + DEEPGRAM_MAX_RECONNECT_ATTEMPTS,
+                            'BROADCAST_URL=' + BROADCAST_URL,
+                            'BROADCAST_SECRET=' + BROADCAST_SECRET,
+                            'NODE_ENV=' + process.env.NODE_ENV,
+                            'YTDLP_PROXY=' + (process.env.YTDLP_PROXY || ''),
+                        ]
+                    });
+                    await docker.getContainer(entry.slug).start();
+                    log.info(`Container started for ${entry.name}`);
                 }
             }
         } catch (err) {
